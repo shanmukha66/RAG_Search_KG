@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 import numpy as np
+from qdrant_client import QdrantClient
+from qdrant_client.http import models
 
 class VectorStore(ABC):
     """Abstract base class for vector storage implementations."""
@@ -58,58 +60,105 @@ class VectorStore(ABC):
         """Update a vector or its metadata."""
         pass
 
-class ChromaVectorStore(VectorStore):
-    """Implementation of vector storage using Chroma."""
+class QdrantVectorStore(VectorStore):
+    """Implementation of vector storage using Qdrant."""
     
-    def __init__(self, collection_name: str, persist_directory: str):
-        import chromadb
-        self.client = chromadb.PersistentClient(path=persist_directory)
-        self.collection = self.client.get_or_create_collection(name=collection_name)
+    def __init__(self, collection_name: str = "multimodal_rag"):
+        self.client = QdrantClient("localhost", port=6333)
+        self.collection_name = collection_name
+        self._ensure_collection()
+    
+    def _ensure_collection(self):
+        """Ensure collection exists with proper schema"""
+        try:
+            self.client.get_collection(self.collection_name)
+        except:
+            # Create collection with necessary vector size and metadata schema
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=models.VectorParams(
+                    size=1536,  # OpenAI embedding size
+                    distance=models.Distance.COSINE
+                )
+            )
     
     async def store(
         self,
-        vectors: np.ndarray,
+        embeddings: List[np.ndarray],
         metadata: List[Dict[str, Any]],
-        ids: Optional[List[str]] = None
-    ) -> List[str]:
-        if ids is None:
-            import uuid
-            ids = [str(uuid.uuid4()) for _ in range(len(vectors))]
+        ids: List[str] = None
+    ):
+        """
+        Store vectors and metadata in Qdrant
         
-        self.collection.add(
-            embeddings=vectors.tolist(),
-            metadatas=metadata,
-            ids=ids
+        Args:
+            embeddings: List of embedding vectors
+            metadata: List of metadata dicts for each vector
+            ids: Optional list of IDs for the vectors
+        """
+        if not ids:
+            ids = [str(i) for i in range(len(embeddings))]
+            
+        points = [
+            models.PointStruct(
+                id=id_,
+                vector=embedding.tolist(),
+                payload=meta
+            )
+            for id_, embedding, meta in zip(ids, embeddings, metadata)
+        ]
+        
+        self.client.upsert(
+            collection_name=self.collection_name,
+            points=points
         )
-        return ids
     
     async def search(
         self,
         query_vector: np.ndarray,
-        k: int = 10,
-        filter: Optional[Dict[str, Any]] = None
+        filter_conditions: Dict[str, Any] = None,
+        limit: int = 10
     ) -> List[Dict[str, Any]]:
-        results = self.collection.query(
-            query_embeddings=[query_vector.tolist()],
-            n_results=k,
-            where=filter
+        """
+        Search for similar vectors with optional filtering
+        
+        Args:
+            query_vector: Query embedding
+            filter_conditions: Optional metadata filters
+            limit: Maximum number of results
+        """
+        search_result = self.client.search(
+            collection_name=self.collection_name,
+            query_vector=query_vector.tolist(),
+            query_filter=models.Filter(
+                must=filter_conditions
+            ) if filter_conditions else None,
+            limit=limit
         )
         
         return [
             {
-                "id": id,
-                "metadata": metadata,
-                "distance": distance
+                'id': point.id,
+                'score': point.score,
+                'metadata': point.payload
             }
-            for id, metadata, distance in zip(
-                results["ids"][0],
-                results["metadatas"][0],
-                results["distances"][0]
-            )
+            for point in search_result
         ]
     
     async def delete(self, ids: List[str]) -> None:
-        self.collection.delete(ids=ids)
+        self.client.delete(
+            collection_name=self.collection_name,
+            points_selector=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="id",
+                        range=models.ValueRange(
+                            values=[id_ for id_ in ids]
+                        )
+                    )
+                ]
+            )
+        )
     
     async def update(
         self,
@@ -118,18 +167,70 @@ class ChromaVectorStore(VectorStore):
         metadata: Optional[Dict[str, Any]] = None
     ) -> None:
         if vector is not None and metadata is not None:
-            self.collection.update(
-                ids=[id],
-                embeddings=[vector.tolist()],
-                metadatas=[metadata]
+            self.client.update_points(
+                collection_name=self.collection_name,
+                points=models.UpdatePoints(
+                    filter=models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="id",
+                                value=models.Value(value=id)
+                            )
+                        ]
+                    ),
+                    update_operations=[
+                        models.UpdateOperation(
+                            key="vector",
+                            operation=models.UpdateOperationType.Set,
+                            value=vector.tolist()
+                        ),
+                        models.UpdateOperation(
+                            key="metadata",
+                            operation=models.UpdateOperationType.Set,
+                            value=metadata
+                        )
+                    ]
+                )
             )
         elif vector is not None:
-            self.collection.update(
-                ids=[id],
-                embeddings=[vector.tolist()]
+            self.client.update_points(
+                collection_name=self.collection_name,
+                points=models.UpdatePoints(
+                    filter=models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="id",
+                                value=models.Value(value=id)
+                            )
+                        ]
+                    ),
+                    update_operations=[
+                        models.UpdateOperation(
+                            key="vector",
+                            operation=models.UpdateOperationType.Set,
+                            value=vector.tolist()
+                        )
+                    ]
+                )
             )
         elif metadata is not None:
-            self.collection.update(
-                ids=[id],
-                metadatas=[metadata]
+            self.client.update_points(
+                collection_name=self.collection_name,
+                points=models.UpdatePoints(
+                    filter=models.Filter(
+                        must=[
+                            models.FieldCondition(
+                                key="id",
+                                value=models.Value(value=id)
+                            )
+                        ]
+                    ),
+                    update_operations=[
+                        models.UpdateOperation(
+                            key="metadata",
+                            operation=models.UpdateOperationType.Set,
+                            value=metadata
+                        )
+                    ]
+                )
             ) 
