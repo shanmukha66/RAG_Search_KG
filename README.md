@@ -1,142 +1,150 @@
 # Multimodal Enterprise RAG System
 
-A powerful Retrieval-Augmented Generation system that supports multiple content types (text, image, audio, video) with a modular pipeline architecture.
+A robust Retrieval-Augmented Generation (RAG) system designed for enterprise use, supporting multiple modalities including text, images, audio, and video.
 
 ## Features
 
-- **Multiple Content Types Support**:
-  - Text: Entity extraction, embedding generation, document classification
-  - Image: OCR, captioning, object detection
-  - Audio: Transcription, speaker diarization
-  - Video: Frame extraction, scene detection, combined audio-visual analysis
+- **Multimodal Processing**
+  - Text: Advanced NLP with entity extraction and semantic analysis
+  - Images: OCR, captioning, and object detection
+  - Audio: Transcription and speaker diarization
+  - Video: Frame extraction and scene detection
 
-- **Advanced Search Capabilities**:
-  - Hybrid search combining vector and graph approaches
-  - Multi-modal content retrieval
-  - Entity-based filtering
+- **Query Types**
+  - Factual queries (direct information lookup)
+  - Summarization queries
+  - Semantic linkage queries (relationships between entities)
+  - Reasoning queries (combining multiple pieces of information)
 
-- **Modern Tech Stack**:
-  - FastAPI backend
-  - React frontend with Material-UI
-  - Qdrant vector store
-  - Neo4j graph database
+- **Evaluation Framework**
+  - Retrieval quality metrics (precision, recall)
+  - Hallucination control
+  - Latency monitoring
+  - Cross-modal linking accuracy
+
+- **Modular Pipeline**
+  - Input validation layer
+  - Query preprocessing
+  - Retrieval orchestration
+  - Answer generation
+  - Post-processing and validation
 
 ## Prerequisites
 
+- Python 3.8+
 - Docker and Docker Compose
-- Python 3.9+
-- Node.js 18+
-- HuggingFace API key
+- Tesseract OCR
+- FFmpeg
 
-## Setup
+### System Dependencies
+
+```bash
+# macOS
+brew install tesseract ffmpeg
+
+# Ubuntu
+sudo apt-get update
+sudo apt-get install -y tesseract-ocr ffmpeg
+```
+
+## Installation
 
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd <repository-name>
+cd multimodal-rag
 ```
 
-2. Create and configure environment variables:
+2. Create and activate a virtual environment:
 ```bash
-# Create .env file with the following variables:
-
-# API Settings
-API_HOST=0.0.0.0
-API_PORT=8000
-DEBUG=True
-
-# Database Settings
-QDRANT_HOST=qdrant
-QDRANT_PORT=6333
-NEO4J_URI=bolt://neo4j:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=password
-
-# Model Settings
-HUGGINGFACE_API_KEY=your_huggingface_api_key_here
-
-# Storage Settings
-UPLOAD_DIR=./uploads
-MAX_UPLOAD_SIZE=104857600  # 100MB in bytes
-
-# Processing Settings
-TEXT_CHUNK_SIZE=1000
-TEXT_CHUNK_OVERLAP=200
-IMAGE_MAX_SIZE=1920,1080
-VIDEO_MAX_LENGTH=300  # seconds
-AUDIO_MAX_LENGTH=300  # seconds
-
-# Search Settings
-MAX_SEARCH_RESULTS=10
-MIN_SIMILARITY_SCORE=0.7
-
-# Monitoring Settings
-ENABLE_PROMETHEUS=True
-PROMETHEUS_PORT=9090
-LOG_LEVEL=INFO
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Build and start the services:
-```bash
-docker-compose up --build
-```
-
-4. Access the applications:
-- Frontend: http://localhost:3000
-- API Documentation: http://localhost:8000/docs
-- Neo4j Browser: http://localhost:7474
-- Qdrant Dashboard: http://localhost:6333/dashboard
-
-## Development
-
-### Backend Development
-
-1. Install Python dependencies:
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Run the FastAPI application:
+4. Set up environment variables:
 ```bash
-python run.py
+cp config.env.example config.env
+# Edit config.env with your settings
 ```
 
-### Frontend Development
+## Docker Setup
 
-1. Install Node.js dependencies:
+1. Build and start the services:
 ```bash
-cd frontend
-npm install
+docker-compose up -d
 ```
 
-2. Start the development server:
-```bash
-npm start
+This will start:
+- FastAPI backend (port 8000)
+- React frontend (port 3000)
+- Qdrant vector store (ports 6333, 6334)
+- Neo4j database (ports 7474, 7687)
+
+## Usage
+
+### API Endpoints
+
+- `POST /api/upload`: Upload multimodal content
+- `POST /api/query`: Submit queries
+- `GET /api/status`: Check system status
+- `GET /api/metrics`: Get evaluation metrics
+
+### Query Examples
+
+```python
+from src import QueryPipeline, QueryType
+
+# Initialize pipeline
+pipeline = QueryPipeline()
+
+# Factual query
+result = await pipeline.process_query({
+    "text": "What was discussed in the last board meeting?",
+    "type": QueryType.FACTUAL
+})
+
+# Semantic linkage query
+result = await pipeline.process_query({
+    "text": "How are Project X and Project Y related?",
+    "type": QueryType.SEMANTIC_LINKAGE
+})
 ```
 
-## Project Structure
+## Development
+
+### Project Structure
 
 ```
 .
 ├── src/
-│   ├── api/              # FastAPI application
-│   ├── processors/       # Content processors
-│   ├── storage/         # Database interfaces
-│   ├── search/          # Search implementations
-│   ├── config/          # Configuration
-│   └── ingestion/       # Ingestion pipelines
-├── frontend/           # React application
-├── tests/             # Test suite
-├── docker/            # Docker configurations
-├── uploads/           # Upload directory
-└── models/            # Cached ML models
+│   ├── evaluation/     # Evaluation metrics and framework
+│   ├── processors/     # Multimodal content processors
+│   ├── query/         # Query pipeline and processing
+│   └── storage/       # Vector and graph storage
+├── data/
+│   ├── uploads/       # Uploaded content
+│   ├── processed/     # Processed data
+│   └── vector_store/  # Vector store data
+├── tests/            # Test suite
+└── docker/           # Docker configuration
 ```
 
-## API Endpoints
+### Running Tests
 
-- `POST /upload/`: Upload and process files
-- `POST /search/`: Search across all content types
-- `GET /health/`: Health check endpoint
+```bash
+pytest tests/
+```
+
+### Evaluation
+
+```bash
+python -m src.evaluation.run_benchmarks
+```
 
 ## Contributing
 
