@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 import numpy as np
-from moviepy.editor import VideoFileClip
+import moviepy.editor as mpy
 import tempfile
 
 from .base import BaseIngestionPipeline, ContentMetadata
@@ -29,7 +29,7 @@ class VideoIngestionPipeline(BaseIngestionPipeline):
         """Extract metadata from the video file."""
         stats = os.stat(content_path)
         
-        with VideoFileClip(str(content_path)) as video:
+        with mpy.VideoFileClip(str(content_path)) as video:
             metadata = {
                 "size_bytes": stats.st_size,
                 "extension": content_path.suffix.lower(),
@@ -53,11 +53,11 @@ class VideoIngestionPipeline(BaseIngestionPipeline):
             metadata=metadata
         )
     
-    async def preprocess(self, content_path: Path) -> VideoFileClip:
+    async def preprocess(self, content_path: Path) -> mpy.VideoFileClip:
         """Load and preprocess the video."""
-        return VideoFileClip(str(content_path))
+        return mpy.VideoFileClip(str(content_path))
     
-    async def extract_content(self, preprocessed_content: VideoFileClip) -> Dict[str, Any]:
+    async def extract_content(self, preprocessed_content: mpy.VideoFileClip) -> Dict[str, Any]:
         """Extract frames and audio from the video."""
         video = preprocessed_content
         

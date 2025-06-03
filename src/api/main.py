@@ -13,7 +13,7 @@ from ..auth.security import (
     Token, User, authenticate_user, create_access_token,
     get_current_active_user, ACCESS_TOKEN_EXPIRE_MINUTES
 )
-from ..ingestion import TextIngestionPipeline, ImageIngestionPipeline, VideoIngestionPipeline
+from ..ingestion import TextIngestionPipeline
 from ..storage import ChromaVectorStore, KnowledgeGraph
 from ..retrieval import HybridSearch
 
@@ -51,16 +51,7 @@ hybrid_search = HybridSearch(
 
 # Pipeline registry with configuration
 PIPELINES = {
-    "text": TextIngestionPipeline({"chunk_size": 1000}),
-    "image": ImageIngestionPipeline({
-        "ocr_lang": config["ocr"]["lang"],
-        "min_confidence": 80
-    }),
-    "video": VideoIngestionPipeline({
-        "frame_sample_rate": 1,
-        "audio_segment_length": 10,
-        "temp_dir": config["storage"]["temp_dir"]
-    })
+    "text": TextIngestionPipeline({"chunk_size": 1000})
 }
 
 class SearchQuery(BaseModel):
