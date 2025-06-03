@@ -7,6 +7,10 @@ from pydantic import BaseModel
 import uvicorn
 import uuid
 from pathlib import Path
+import asyncio
+import logging
+import tempfile
+import shutil
 
 from ..config import config
 from ..auth.security import (
@@ -16,17 +20,25 @@ from ..auth.security import (
 from ..ingestion import TextIngestionPipeline, ImageIngestionPipeline, VideoIngestionPipeline
 from ..storage import ChromaVectorStore, KnowledgeGraph
 from ..retrieval import HybridSearch
+from ..storage.vector_store import QdrantVectorStore
+from ..storage.graph_store import GraphStore
+from ..ingestion.pipeline import IngestionPipeline
+from ..search.hybrid_search import HybridSearchEngine
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Multimodal Enterprise RAG",
-    description="API for multimodal content ingestion and retrieval",
-    version="0.1.0"
+    title="Multimodal RAG API",
+    description="API for multimodal document ingestion and retrieval",
+    version="1.0.0"
 )
 
-# Add CORS middleware
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],  # React dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -75,6 +87,38 @@ class SearchResponse(BaseModel):
     total: int
     query_time_ms: float
 
+# Dependency Injection
+async def get_vector_store():
+    store = QdrantVectorStore()
+    try:
+        yield store
+    finally:
+        # Cleanup if needed
+        pass
+
+async def get_graph_store():
+    store = GraphStore()
+    try:
+        yield store
+    finally:
+        store.close()
+
+async def get_ingestion_pipeline():
+    pipeline = IngestionPipeline()
+    try:
+        yield pipeline
+    finally:
+        # Cleanup if needed
+        pass
+
+async def get_search_engine():
+    engine = HybridSearchEngine()
+    try:
+        yield engine
+    finally:
+        # Cleanup if needed
+        pass
+
 @app.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends()
@@ -94,137 +138,102 @@ async def login_for_access_token(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/ingest/file")
-async def ingest_file(
-    file: UploadFile = File(...),
-    content_type: str = Form(...),
-    metadata: Optional[Dict[str, Any]] = Form(None),
-    current_user: User = Security(get_current_active_user, scopes=["write"])
+@app.post("/upload/")
+async def upload_files(
+    files: List[UploadFile] = File(...),
+    pipeline: IngestionPipeline = Depends(get_ingestion_pipeline),
+    vector_store: QdrantVectorStore = Depends(get_vector_store),
+    graph_store: GraphStore = Depends(get_graph_store)
 ):
-    """Ingest a file into the system."""
-    try:
-        if content_type not in PIPELINES:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported content type: {content_type}"
-            )
-        
-        pipeline = PIPELINES[content_type]
-        content_path = Path(file.filename)
-        
-        # Validate file
-        if not await pipeline.validate(content_path):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid file format"
-            )
-        
-        # Process content
-        metadata = await pipeline.extract_metadata(content_path)
-        preprocessed = await pipeline.preprocess(content_path)
-        content = await pipeline.extract_content(preprocessed)
-        enriched = await pipeline.enrich(content)
-        
-        # Generate unique ID
-        content_id = str(uuid.uuid4())
-        
-        # Store in vector store
-        await vector_store.store(
-            vectors=[enriched["embedding"]],
-            metadata=[{
-                "id": content_id,
-                "content_type": content_type,
-                **metadata.__dict__,
-                **enriched
-            }]
-        )
-        
-        # Store in knowledge graph
-        await knowledge_graph.add_content_node(
-            content_id=content_id,
-            content_type=content_type,
-            metadata=metadata.__dict__
-        )
-        
-        # Add relationships based on extracted entities
-        if "entities" in enriched:
-            for entity in enriched["entities"]:
-                entity_id = await knowledge_graph.add_entity(
-                    entity_type=entity["type"],
-                    name=entity["name"],
-                    properties=entity["properties"]
-                )
-                await knowledge_graph.add_relationship(
-                    from_id=content_id,
-                    to_id=entity_id,
-                    relationship_type="CONTAINS",
-                    properties={"confidence": entity["confidence"]}
-                )
-        
-        return {
-            "content_id": content_id,
-            "status": "success",
-            "metadata": metadata.__dict__
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        await pipeline.cleanup()
+    """
+    Upload and process multiple files
+    """
+    results = []
+    
+    for file in files:
+        try:
+            # Save uploaded file temporarily
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                shutil.copyfileobj(file.file, temp_file)
+                temp_path = Path(temp_file.name)
+            
+            # Process the file
+            try:
+                processed_data = await pipeline.process_file(temp_path)
+                
+                # Store in vector database
+                if 'embeddings' in processed_data:
+                    await vector_store.store(
+                        embeddings=[processed_data['embeddings']],
+                        metadata=[processed_data['metadata']]
+                    )
+                
+                # Store in graph database
+                if 'entities' in processed_data:
+                    for entity in processed_data['entities']:
+                        entity_id = await graph_store.create_entity(
+                            entity_type=entity['type'],
+                            properties=entity['properties']
+                        )
+                        # Create relationships
+                        if 'relationships' in entity:
+                            for rel in entity['relationships']:
+                                await graph_store.create_relationship(
+                                    from_id=entity_id,
+                                    to_id=rel['target_id'],
+                                    relationship_type=rel['type'],
+                                    properties=rel.get('properties', {})
+                                )
+                
+                results.append({
+                    "filename": file.filename,
+                    "status": "success",
+                    "metadata": processed_data.get('metadata', {})
+                })
+                
+            finally:
+                # Clean up temporary file
+                temp_path.unlink()
+                
+        except Exception as e:
+            logger.error(f"Error processing file {file.filename}: {str(e)}")
+            results.append({
+                "filename": file.filename,
+                "status": "error",
+                "error": str(e)
+            })
+            
+    return {"results": results}
 
-@app.post("/search", response_model=SearchResponse)
+@app.post("/search/")
 async def search(
-    query: SearchQuery,
-    current_user: User = Security(get_current_active_user, scopes=["read"])
+    query: str,
+    modalities: List[str] = ["text", "image", "audio", "video"],
+    limit: int = 10,
+    search_engine: HybridSearchEngine = Depends(get_search_engine)
 ):
-    """Search across ingested content."""
+    """
+    Perform hybrid search across multiple modalities
+    """
     try:
-        results = await hybrid_search.search(
-            query=query.query,
-            content_type=query.content_type,
-            k=query.limit
+        results = await search_engine.search(
+            query=query,
+            modalities=modalities,
+            limit=limit
         )
-        
-        if query.expand_results:
-            results = await hybrid_search.expand_results(results)
-        
-        return SearchResponse(
-            results=results,
-            total=len(results),
-            query_time_ms=0.0  # Should be measured
-        )
+        return {"results": results}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/content/{content_id}")
-async def get_content(
-    content_id: str,
-    current_user: User = Security(get_current_active_user, scopes=["read"])
-):
-    """Get content by ID."""
-    try:
-        # Get from knowledge graph
-        content = await knowledge_graph.search_content(
-            properties={"id": content_id},
-            limit=1
+        logger.error(f"Search error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Search failed: {str(e)}"
         )
-        
-        if not content:
-            raise HTTPException(status_code=404, detail="Content not found")
-        
-        # Get related entities
-        related = await knowledge_graph.get_related_entities(content_id)
-        
-        return {
-            "content": content[0],
-            "related_entities": related
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/health")
+@app.get("/health/")
 async def health_check():
-    """Check if the API is running."""
+    """
+    Health check endpoint
+    """
     return {"status": "healthy"}
 
 if __name__ == "__main__":

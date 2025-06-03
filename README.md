@@ -1,68 +1,151 @@
 # Multimodal Enterprise RAG System
 
-A sophisticated Retrieval-Augmented Generation (RAG) system that supports text, image, audio, and video ingestion, builds a searchable knowledge graph, and enables hybrid search using keyword and vector retrieval.
+A powerful Retrieval-Augmented Generation system that supports multiple content types (text, image, audio, video) with a modular pipeline architecture.
 
 ## Features
 
-- Multi-modal content ingestion (text, image, audio, video)
-- Knowledge graph construction using Neo4j
-- Hybrid search combining structured graph traversal and semantic vector retrieval
-- Support for various query types (factual, lookup, reasoning)
-- Real-time feedback and query improvement
-- Security-aware design with access control
-- Modular and scalable pipeline architecture
+- **Multiple Content Types Support**:
+  - Text: Entity extraction, embedding generation, document classification
+  - Image: OCR, captioning, object detection
+  - Audio: Transcription, speaker diarization
+  - Video: Frame extraction, scene detection, combined audio-visual analysis
 
-## System Requirements
+- **Advanced Search Capabilities**:
+  - Hybrid search combining vector and graph approaches
+  - Multi-modal content retrieval
+  - Entity-based filtering
 
+- **Modern Tech Stack**:
+  - FastAPI backend
+  - React frontend with Material-UI
+  - Qdrant vector store
+  - Neo4j graph database
+
+## Prerequisites
+
+- Docker and Docker Compose
 - Python 3.9+
-- Neo4j Database
-- GPU recommended for optimal performance
-- FFmpeg for video/audio processing
-- Tesseract OCR for image text extraction
+- Node.js 18+
+- HuggingFace API key
 
 ## Setup
 
-1. Create a virtual environment:
+1. Clone the repository:
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+git clone <repository-url>
+cd <repository-name>
 ```
 
-2. Install dependencies:
+2. Create and configure environment variables:
+```bash
+# Create .env file with the following variables:
+
+# API Settings
+API_HOST=0.0.0.0
+API_PORT=8000
+DEBUG=True
+
+# Database Settings
+QDRANT_HOST=qdrant
+QDRANT_PORT=6333
+NEO4J_URI=bolt://neo4j:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=password
+
+# Model Settings
+HUGGINGFACE_API_KEY=your_huggingface_api_key_here
+
+# Storage Settings
+UPLOAD_DIR=./uploads
+MAX_UPLOAD_SIZE=104857600  # 100MB in bytes
+
+# Processing Settings
+TEXT_CHUNK_SIZE=1000
+TEXT_CHUNK_OVERLAP=200
+IMAGE_MAX_SIZE=1920,1080
+VIDEO_MAX_LENGTH=300  # seconds
+AUDIO_MAX_LENGTH=300  # seconds
+
+# Search Settings
+MAX_SEARCH_RESULTS=10
+MIN_SIMILARITY_SCORE=0.7
+
+# Monitoring Settings
+ENABLE_PROMETHEUS=True
+PROMETHEUS_PORT=9090
+LOG_LEVEL=INFO
+```
+
+3. Build and start the services:
+```bash
+docker-compose up --build
+```
+
+4. Access the applications:
+- Frontend: http://localhost:3000
+- API Documentation: http://localhost:8000/docs
+- Neo4j Browser: http://localhost:7474
+- Qdrant Dashboard: http://localhost:6333/dashboard
+
+## Development
+
+### Backend Development
+
+1. Install Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Environment Configuration:
-- Copy `.env.example` to `.env`
-- Configure your API keys and database credentials
+2. Run the FastAPI application:
+```bash
+python run.py
+```
+
+### Frontend Development
+
+1. Install Node.js dependencies:
+```bash
+cd frontend
+npm install
+```
+
+2. Start the development server:
+```bash
+npm start
+```
 
 ## Project Structure
 
 ```
 .
 ├── src/
-│   ├── ingestion/         # Content ingestion pipelines
-│   ├── processing/        # Content processing and enrichment
-│   ├── storage/           # Vector store and knowledge graph
-│   ├── retrieval/         # Search and retrieval logic
-│   ├── api/              # FastAPI endpoints
-│   └── utils/            # Helper functions
-├── tests/                # Test suite
-├── config/              # Configuration files
-└── examples/            # Usage examples
+│   ├── api/              # FastAPI application
+│   ├── processors/       # Content processors
+│   ├── storage/         # Database interfaces
+│   ├── search/          # Search implementations
+│   ├── config/          # Configuration
+│   └── ingestion/       # Ingestion pipelines
+├── frontend/           # React application
+├── tests/             # Test suite
+├── docker/            # Docker configurations
+├── uploads/           # Upload directory
+└── models/            # Cached ML models
 ```
 
-## Getting Started
+## API Endpoints
 
-[Documentation to be added as the project develops]
+- `POST /upload/`: Upload and process files
+- `POST /search/`: Search across all content types
+- `GET /health/`: Health check endpoint
 
-## Testing
+## Contributing
 
-```bash
-pytest tests/
-```
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
-[License information to be added] 
+This project is licensed under the MIT License - see the LICENSE file for details. 

@@ -1,18 +1,45 @@
 # Core dependencies
-fastapi==0.109.0
-uvicorn==0.27.0
-python-multipart==0.0.6
-pydantic==2.5.3
+fastapi==0.68.1
+uvicorn==0.15.0
+python-multipart==0.0.5
+python-dotenv==0.19.0
+pydantic==1.8.2
+
+# Storage
+qdrant-client==1.1.1
+neo4j==4.4.3
+
+# Text processing
+spacy==3.5.0
+transformers==4.26.0
+sentence-transformers==2.2.2
+torch==2.0.0
+
+# Image processing
+Pillow==9.4.0
+pytesseract==0.3.10
+opencv-python==4.7.0.72
+
+# Audio processing
+whisper==1.0.0
+pyannote.audio==2.1.1
+soundfile==0.12.1
+librosa==0.10.0
+
+# Video processing
+scenedetect==0.6.1
+ffmpeg-python==0.2.0
+
+# Utilities
+numpy==1.24.2
+pandas==1.5.3
+tqdm==4.65.0
+requests==2.28.2
+aiohttp==3.8.4
 
 # Evaluation
-deepeval==0.20.9
-pytest==7.4.3
-
-# Vector store
-qdrant-client==1.7.0
-
-# Graph database
-neo4j==5.14.0
+deepeval==0.1.0
+pytest==7.3.1
 
 # ML & Data Processing
 numpy==1.24.3
