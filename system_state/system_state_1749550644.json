@@ -1,0 +1,27 @@
+{
+  "timestamp": 1749550644.4912581,
+  "services": {
+    "qdrant": {
+      "name": "qdrant",
+      "state": "running",
+      "last_check": 1749550644.486101,
+      "error_count": 0,
+      "last_error": null,
+      "recovery_attempts": 0,
+      "metadata": {}
+    },
+    "neo4j": {
+      "name": "neo4j",
+      "state": "running",
+      "last_check": 1749550644.4912481,
+      "error_count": 0,
+      "last_error": null,
+      "recovery_attempts": 0,
+      "metadata": {}
+    }
+  },
+  "metadata": {
+    "backup_version": "1.0",
+    "system_id": "ab7f51d4-8be7-4e61-8dba-416744d8cee4"
+  }
+}

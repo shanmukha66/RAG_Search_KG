@@ -87,7 +87,7 @@
         <div class="max-w-4xl mx-auto mb-8">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-xl font-semibold mb-4 text-gray-800">Response Metrics</h2>
-                <div id="metrics" class="grid grid-cols-2 gap-4">
+                <div id="metrics" class="grid grid-cols-3 gap-4">
                     <div class="p-4 bg-gray-50 rounded-lg">
                         <h3 class="font-medium text-gray-700">Latency</h3>
                         <p id="latencyMetric" class="text-2xl font-bold text-blue-600">-</p>
@@ -95,6 +95,10 @@
                     <div class="p-4 bg-gray-50 rounded-lg">
                         <h3 class="font-medium text-gray-700">Relevance Score</h3>
                         <p id="relevanceMetric" class="text-2xl font-bold text-green-600">-</p>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium text-gray-700">Factual Accuracy</h3>
+                        <p id="hallucinationMetric" class="text-2xl font-bold text-purple-600">-</p>
                     </div>
                 </div>
             </div>
@@ -159,6 +163,7 @@
                 // Display metrics
                 document.getElementById('latencyMetric').textContent = data.metrics.latency;
                 document.getElementById('relevanceMetric').textContent = data.metrics.relevance_score;
+                document.getElementById('hallucinationMetric').textContent = data.metrics.hallucination_score;
                 
                 // Display AI response
                 const aiResponse = document.getElementById('aiResponse');

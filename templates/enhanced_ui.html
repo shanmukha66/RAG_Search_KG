@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise RAG Search System</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .tab-button.active { background-color: #3B82F6; color: white; }
+        .result-card { transition: transform 0.2s; }
+        .result-card:hover { transform: translateY(-2px); }
+        .loading { display: none; }
+        .loading.active { display: block; }
+        .status-healthy { color: #10B981; }
+        .status-degraded { color: #F59E0B; }
+        .status-unhealthy { color: #EF4444; }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+        }
+        .modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal" onclick="closeModal()">
+        <span class="absolute top-4 right-8 text-white text-4xl cursor-pointer">&times;</span>
+        <img class="max-w-full max-h-full" id="modalImage">
+    </div>
+
+    <!-- Header -->
+    <div class="bg-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-brain mr-2 text-blue-600"></i>
+                    Enterprise RAG Search System
+                </h1>
+                <div class="flex space-x-4">
+                    <div id="systemStatus" class="flex items-center">
+                        <i class="fas fa-circle text-gray-400 mr-2"></i>
+                        <span class="text-sm text-gray-600">Checking status...</span>
+                    </div>
+                    <button onclick="refreshSystemStatus()" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-white border-b">
+        <div class="container mx-auto px-4">
+            <div class="flex space-x-1">
+                <button onclick="showTab('search')" class="tab-button active px-6 py-3 font-medium text-gray-700 hover:text-blue-600">
+                    <i class="fas fa-search mr-2"></i>Search
+                </button>
+                <button onclick="showTab('advanced')" class="tab-button px-6 py-3 font-medium text-gray-700 hover:text-blue-600">
+                    <i class="fas fa-cogs mr-2"></i>Advanced Search
+                </button>
+                <button onclick="showTab('upload')" class="tab-button px-6 py-3 font-medium text-gray-700 hover:text-blue-600">
+                    <i class="fas fa-upload mr-2"></i>File Upload
+                </button>
+                <button onclick="showTab('metrics')" class="tab-button px-6 py-3 font-medium text-gray-700 hover:text-blue-600">
+                    <i class="fas fa-chart-line mr-2"></i>Metrics
+                </button>
+                <button onclick="showTab('monitoring')" class="tab-button px-6 py-3 font-medium text-gray-700 hover:text-blue-600">
+                    <i class="fas fa-monitor-heart-rate mr-2"></i>Monitoring
+                </button>
+                <button onclick="showTab('admin')" class="tab-button px-6 py-3 font-medium text-gray-700 hover:text-blue-600">
+                    <i class="fas fa-shield-alt mr-2"></i>Admin
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-6">
+        <!-- Search Tab -->
+        <div id="searchTab" class="tab-content active">
+            <div class="max-w-4xl mx-auto">
+                <!-- Basic Search -->
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4">
+                        <i class="fas fa-search mr-2 text-blue-600"></i>Quick Search
+                    </h2>
+                    <div class="relative">
+                        <input type="text" id="searchInput" 
+                               class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               placeholder="Enter your search query...">
+                        <button onclick="performSearch()" 
+                                class="absolute right-2 top-2 bg-blue-500 text-white px-4 py-1 rounded-md hover:bg-blue-600">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loading" class="loading text-center mb-8">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                    <p class="mt-2 text-gray-600">Searching...</p>
+                </div>
+
+                <!-- Quick Metrics -->
+                <div id="quickMetrics" class="grid grid-cols-3 gap-4 mb-6" style="display: none;">
+                    <div class="metric-card p-4 rounded-lg">
+                        <h3 class="font-medium opacity-90">Latency</h3>
+                        <p id="latencyMetric" class="text-2xl font-bold">-</p>
+                    </div>
+                    <div class="metric-card p-4 rounded-lg">
+                        <h3 class="font-medium opacity-90">Relevance</h3>
+                        <p id="relevanceMetric" class="text-2xl font-bold">-</p>
+                    </div>
+                    <div class="metric-card p-4 rounded-lg">
+                        <h3 class="font-medium opacity-90">Accuracy</h3>
+                        <p id="hallucinationMetric" class="text-2xl font-bold">-</p>
+                    </div>
+                </div>
+
+                <!-- AI Response -->
+                <div id="aiResponseSection" class="bg-white rounded-lg shadow-lg p-6 mb-6" style="display: none;">
+                    <h2 class="text-xl font-semibold mb-4">
+                        <i class="fas fa-robot mr-2 text-green-600"></i>AI Response
+                    </h2>
+                    <div id="aiResponse" class="prose max-w-none text-gray-800"></div>
+                </div>
+
+                <!-- Search Results -->
+                <div id="resultsSection" class="grid md:grid-cols-2 gap-6" style="display: none;">
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">
+                            <i class="fas fa-vector-square mr-2 text-purple-600"></i>Vector Search Results
+                        </h3>
+                        <div id="vectorResults" class="space-y-4"></div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">
+                            <i class="fas fa-project-diagram mr-2 text-orange-600"></i>Graph Search Results
+                        </h3>
+                        <div id="graphResults" class="space-y-4"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Search Tab -->
+        <div id="advancedTab" class="tab-content">
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-semibold mb-6">
+                        <i class="fas fa-cogs mr-2 text-blue-600"></i>Advanced Search Options
+                    </h2>
+                    
+                    <div class="space-y-6">
+                        <!-- Query Configuration -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Search Query</label>
+                            <textarea id="advancedQuery" rows="3" 
+                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                     placeholder="Enter your detailed search query..."></textarea>
+                        </div>
+
+                        <!-- Search Options -->
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Search Method</label>
+                                <select id="searchMethod" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="hybrid">Hybrid (Vector + Graph)</option>
+                                    <option value="vector">Vector Only</option>
+                                    <option value="graph">Graph Only</option>
+                                    <option value="keyword">Keyword Only</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Result Limit</label>
+                                <input type="number" id="resultLimit" value="10" min="1" max="50"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+
+                        <!-- Filters -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Content Filters</label>
+                            <div class="grid grid-cols-3 gap-4">
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="includeText" checked class="mr-2">
+                                    <span>Text Content</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="includeImages" checked class="mr-2">
+                                    <span>Images</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="includeAudio" checked class="mr-2">
+                                    <span>Audio/Video</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Options -->
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Similarity Threshold</label>
+                                <input type="range" id="similarityThreshold" min="0" max="1" step="0.1" value="0.7" 
+                                       class="w-full">
+                                <span class="text-sm text-gray-600">Current: <span id="thresholdValue">0.7</span></span>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Query Expansion</label>
+                                <select id="queryExpansion" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                                    <option value="auto">Auto Expansion</option>
+                                    <option value="synonyms">Include Synonyms</option>
+                                    <option value="none">No Expansion</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button onclick="performAdvancedSearch()" 
+                                class="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 font-medium">
+                            <i class="fas fa-search mr-2"></i>Perform Advanced Search
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Advanced Results -->
+                <div id="advancedResults" class="mt-6" style="display: none;">
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">Advanced Search Results</h3>
+                        <div id="advancedResultsContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- File Upload Tab -->
+        <div id="uploadTab" class="tab-content">
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-semibold mb-6">
+                        <i class="fas fa-upload mr-2 text-green-600"></i>Multimodal File Upload
+                    </h2>
+                    
+                    <div class="space-y-6">
+                        <!-- File Upload Area -->
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+                            <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                            <p class="text-lg text-gray-600 mb-2">Drag and drop files here or click to browse</p>
+                            <p class="text-sm text-gray-500 mb-4">Supported: PDF, TXT, DOC, JPG, PNG, MP3, MP4</p>
+                            <input type="file" id="fileInput" multiple accept=".pdf,.txt,.doc,.docx,.jpg,.jpeg,.png,.mp3,.mp4,.wav" 
+                                   class="hidden" onchange="handleFileSelect(event)">
+                            <button onclick="document.getElementById('fileInput').click()" 
+                                    class="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600">
+                                Choose Files
+                            </button>
+                        </div>
+
+                        <!-- Selected Files -->
+                        <div id="selectedFiles" class="space-y-2"></div>
+
+                        <!-- Upload Options -->
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Processing Options</label>
+                                <div class="space-y-2">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="extractEntities" checked class="mr-2">
+                                        <span>Extract Entities</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="generateSummary" checked class="mr-2">
+                                        <span>Generate Summary</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" id="createRelations" checked class="mr-2">
+                                        <span>Create Relationships</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Content Category</label>
+                                <select id="contentCategory" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                                    <option value="general">General Content</option>
+                                    <option value="technical">Technical Documentation</option>
+                                    <option value="legal">Legal Documents</option>
+                                    <option value="medical">Medical Records</option>
+                                    <option value="financial">Financial Reports</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button onclick="uploadFiles()" 
+                                class="w-full bg-green-600 text-white py-3 rounded-md hover:bg-green-700 font-medium">
+                            <i class="fas fa-upload mr-2"></i>Upload and Process Files
+                        </button>
+                    </div>
+
+                    <!-- Upload Progress -->
+                    <div id="uploadProgress" class="mt-6" style="display: none;">
+                        <div class="bg-gray-200 rounded-full h-2">
+                            <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <p id="progressText" class="text-sm text-gray-600 mt-2">Processing...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metrics Tab -->
+        <div id="metricsTab" class="tab-content">
+            <div class="max-w-6xl mx-auto space-y-6">
+                <!-- Performance Overview -->
+                <div class="grid grid-cols-4 gap-6">
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">Total Queries</p>
+                                <p id="totalQueries" class="text-2xl font-bold text-blue-600">-</p>
+                            </div>
+                            <i class="fas fa-search text-3xl text-blue-600"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">Avg Response Time</p>
+                                <p id="avgResponseTime" class="text-2xl font-bold text-green-600">-</p>
+                            </div>
+                            <i class="fas fa-clock text-3xl text-green-600"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">Avg Relevance</p>
+                                <p id="avgRelevance" class="text-2xl font-bold text-purple-600">-</p>
+                            </div>
+                            <i class="fas fa-bullseye text-3xl text-purple-600"></i>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">Error Rate</p>
+                                <p id="errorRate" class="text-2xl font-bold text-red-600">-</p>
+                            </div>
+                            <i class="fas fa-exclamation-triangle text-3xl text-red-600"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Metrics -->
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">Query Performance Trends</h3>
+                        <div id="performanceChart" class="h-64 flex items-center justify-center text-gray-500">
+                            Performance chart will be displayed here
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">Recent Query History</h3>
+                        <div id="queryHistory" class="space-y-2 max-h-64 overflow-y-auto">
+                            <!-- Query history will be populated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="loadMetrics()" 
+                        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh Metrics
+                </button>
+            </div>
+        </div>
+
+        <!-- Monitoring Tab -->
+        <div id="monitoringTab" class="tab-content">
+            <div class="max-w-6xl mx-auto space-y-6">
+                <!-- System Health Overview -->
+                <div class="grid grid-cols-3 gap-6">
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">
+                            <i class="fas fa-server mr-2 text-blue-600"></i>System Resources
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">CPU Usage</span>
+                                <span id="cpuUsage" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Memory Usage</span>
+                                <span id="memoryUsage" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Disk Usage</span>
+                                <span id="diskUsage" class="font-medium">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">
+                            <i class="fas fa-database mr-2 text-green-600"></i>Database Status
+                        </h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Qdrant</span>
+                                <span id="qdrantStatus" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Neo4j</span>
+                                <span id="neo4jStatus" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm text-gray-600">Connection Pool</span>
+                                <span id="connectionPool" class="font-medium">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">
+                            <i class="fas fa-exclamation-triangle mr-2 text-orange-600"></i>Recent Errors
+                        </h3>
+                        <div id="recentErrors" class="space-y-2 max-h-32 overflow-y-auto text-sm">
+                            <!-- Recent errors will be populated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Service Health Checks -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">Service Health Checks</h3>
+                    <div id="healthChecks" class="grid grid-cols-2 gap-4">
+                        <!-- Health checks will be populated here -->
+                    </div>
+                </div>
+
+                <button onclick="loadMonitoring()" 
+                        class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh Monitoring Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Admin Tab -->
+        <div id="adminTab" class="tab-content">
+            <div class="max-w-4xl mx-auto space-y-6">
+                <!-- System Controls -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">
+                        <i class="fas fa-cog mr-2 text-gray-600"></i>System Controls
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="triggerSystemRecovery()" 
+                                class="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700">
+                            <i class="fas fa-redo mr-2"></i>Trigger System Recovery
+                        </button>
+                        <button onclick="clearCache()" 
+                                class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+                            <i class="fas fa-trash mr-2"></i>Clear Cache
+                        </button>
+                        <button onclick="optimizeQueries()" 
+                                class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                            <i class="fas fa-rocket mr-2"></i>Optimize Queries
+                        </button>
+                        <button onclick="exportLogs()" 
+                                class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                            <i class="fas fa-download mr-2"></i>Export Logs
+                        </button>
+                    </div>
+                </div>
+
+                <!-- System Information -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">System Information</h3>
+                    <div id="systemInfo" class="space-y-2 text-sm">
+                        <!-- System info will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Error Statistics -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">Error Statistics</h3>
+                    <div id="errorStats" class="space-y-2">
+                        <!-- Error stats will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab Management
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+
+            // Load tab-specific data
+            if (tabName === 'metrics') loadMetrics();
+            if (tabName === 'monitoring') loadMonitoring();
+            if (tabName === 'admin') loadSystemInfo();
+        }
+
+        // System Status
+        async function refreshSystemStatus() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                
+                const statusElement = document.getElementById('systemStatus');
+                const icon = statusElement.querySelector('i');
+                const text = statusElement.querySelector('span');
+                
+                // Use overall_status from the actual health response
+                if (data.overall_status === 'healthy') {
+                    icon.className = 'fas fa-circle status-healthy mr-2';
+                    text.textContent = 'System Healthy';
+                } else if (data.overall_status === 'degraded') {
+                    icon.className = 'fas fa-circle status-degraded mr-2';
+                    text.textContent = 'System Degraded';
+                } else {
+                    icon.className = 'fas fa-circle status-unhealthy mr-2';
+                    text.textContent = 'System Issues';
+                }
+            } catch (error) {
+                const statusElement = document.getElementById('systemStatus');
+                const icon = statusElement.querySelector('i');
+                const text = statusElement.querySelector('span');
+                icon.className = 'fas fa-circle status-unhealthy mr-2';
+                text.textContent = 'Connection Error';
+            }
+        }
+
+        // Basic Search
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value;
+            if (!query.trim()) return;
+
+            document.getElementById('loading').classList.add('active');
+            
+            try {
+                const formData = new FormData();
+                formData.append('query', query);
+
+                const response = await fetch('/search', { method: 'POST', body: formData });
+                const data = await response.json();
+                
+                // Show metrics
+                document.getElementById('quickMetrics').style.display = 'grid';
+                document.getElementById('latencyMetric').textContent = data.metrics.latency;
+                document.getElementById('relevanceMetric').textContent = data.metrics.relevance_score;
+                document.getElementById('hallucinationMetric').textContent = data.metrics.hallucination_score;
+                
+                // Show AI response
+                if (data.ai_response) {
+                    document.getElementById('aiResponseSection').style.display = 'block';
+                    document.getElementById('aiResponse').innerHTML = `<p>${data.ai_response}</p>`;
+                }
+                
+                // Show results
+                document.getElementById('resultsSection').style.display = 'grid';
+                displayResults('vectorResults', data.vector_results);
+                displayResults('graphResults', data.graph_results);
+                
+            } catch (error) {
+                console.error('Search error:', error);
+                alert('Search failed. Please try again.');
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        // Advanced Search
+        async function performAdvancedSearch() {
+            const query = document.getElementById('advancedQuery').value;
+            const method = document.getElementById('searchMethod').value;
+            const limit = document.getElementById('resultLimit').value;
+            
+            if (!query.trim()) {
+                alert('Please enter a search query');
+                return;
+            }
+
+            try {
+                // Show loading state
+                document.getElementById('advancedResults').style.display = 'block';
+                document.getElementById('advancedResultsContent').innerHTML = 
+                    '<div class="flex items-center justify-center py-8"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div><span class="ml-2">Searching...</span></div>';
+
+                const payload = {
+                    query: query.trim(),
+                    search_method: method,
+                    limit: parseInt(limit),
+                    include_text: document.getElementById('includeText').checked,
+                    include_images: document.getElementById('includeImages').checked,
+                    include_audio: document.getElementById('includeAudio').checked,
+                    similarity_threshold: parseFloat(document.getElementById('similarityThreshold').value),
+                    query_expansion: document.getElementById('queryExpansion').value
+                };
+
+                console.log('Sending advanced search payload:', payload);
+
+                // Convert to FormData since backend expects form data
+                const formData = new FormData();
+                formData.append('query', payload.query);
+                formData.append('session_id', 'frontend-session-' + Date.now());
+                
+                const response = await fetch('/search_advanced', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Advanced search response:', data);
+                
+                // Display results in a more user-friendly format
+                if (data.search_results && data.search_results.length > 0) {
+                    const resultsHtml = data.search_results.map(result => `
+                        <div class="bg-gray-50 p-4 rounded-md mb-3">
+                            <div class="font-medium text-gray-800">${result.question || 'No question'}</div>
+                            <div class="text-sm text-gray-600 mt-1">${result.text || result.doc_text || ''}</div>
+                            <div class="text-sm text-gray-600 mt-1"><strong>Answer:</strong> ${result.answer || 'No answer'}</div>
+                            <div class="text-xs text-gray-500 mt-2">Score: ${result.score?.toFixed(4) || 'N/A'}</div>
+                            ${result.image_url ? `<img src="${result.image_url}" alt="Document Image" class="mt-2 max-w-full h-32 object-cover rounded cursor-pointer" onclick="openModal('${result.image_url}')">` : ''}
+                        </div>
+                    `).join('');
+                    
+                    document.getElementById('advancedResultsContent').innerHTML = `
+                        <div class="mb-4">
+                            <h4 class="font-semibold text-lg">Search Results (${data.search_results.length})</h4>
+                            <p class="text-sm text-gray-600 mb-3">Method: ${method} | Processing time: ${data.metadata?.processing_time || 'N/A'}</p>
+                        </div>
+                        ${resultsHtml}
+                    `;
+                } else {
+                    document.getElementById('advancedResultsContent').innerHTML = `
+                        <div class="text-center py-8">
+                            <div class="text-gray-500 text-lg">No results found</div>
+                            <p class="text-sm text-gray-400 mt-2">Try adjusting your search parameters or query</p>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Advanced search error:', error);
+                document.getElementById('advancedResultsContent').innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="text-red-600 text-lg">Search Error</div>
+                        <p class="text-sm text-red-500 mt-2">${error.message}</p>
+                        <button onclick="performAdvancedSearch()" class="mt-3 bg-blue-500 text-white px-4 py-2 rounded text-sm hover:bg-blue-600">
+                            Try Again
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // File Upload Functions
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            const container = document.getElementById('selectedFiles');
+            container.innerHTML = '';
+            
+            files.forEach(file => {
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-md';
+                fileDiv.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-file mr-3 text-blue-600"></i>
+                        <div>
+                            <p class="font-medium">${file.name}</p>
+                            <p class="text-sm text-gray-600">${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                    </div>
+                    <button onclick="removeFile('${file.name}')" class="text-red-600 hover:text-red-800">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                container.appendChild(fileDiv);
+            });
+        }
+
+        async function uploadFiles() {
+            const fileInput = document.getElementById('fileInput');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                alert('Please select files to upload');
+                return;
+            }
+
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append('files', file);
+            }
+            formData.append('extract_entities', document.getElementById('extractEntities').checked);
+            formData.append('generate_summary', document.getElementById('generateSummary').checked);
+            formData.append('create_relations', document.getElementById('createRelations').checked);
+            formData.append('category', document.getElementById('contentCategory').value);
+
+            try {
+                document.getElementById('uploadProgress').style.display = 'block';
+                // Note: File upload endpoint would need to be implemented
+                alert('File upload feature requires additional backend implementation');
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Upload failed. Please try again.');
+            }
+        }
+
+        // Metrics Functions
+        async function loadMetrics() {
+            try {
+                const response = await fetch('/performance_metrics');
+                const data = await response.json();
+                
+                // Update metrics from the actual data structure
+                const optimizer = data.query_optimizer || {};
+                document.getElementById('totalQueries').textContent = optimizer.total_queries || '0';
+                document.getElementById('avgResponseTime').textContent = 
+                    data.agent_performance?.vector?.execution_time 
+                    ? `${(data.agent_performance.vector.execution_time * 1000).toFixed(2)}ms` 
+                    : '0ms';
+                document.getElementById('avgRelevance').textContent = 
+                    optimizer.avg_satisfaction 
+                    ? `${(optimizer.avg_satisfaction * 100).toFixed(1)}%` 
+                    : '0.0%';
+                
+                // Calculate error rate from success rates
+                const vectorSuccess = data.agent_performance?.vector?.success_rate || 1.0;
+                const errorRate = ((1 - vectorSuccess) * 100).toFixed(1);
+                document.getElementById('errorRate').textContent = `${errorRate}%`;
+                
+                // Load query history (using optimizer data)
+                const historyContainer = document.getElementById('queryHistory');
+                if (optimizer.recent_queries > 0) {
+                    historyContainer.innerHTML = `
+                        <div class="p-2 bg-gray-50 rounded text-sm">
+                            <span class="font-medium">Recent Queries: ${optimizer.recent_queries}</span>
+                            <span class="text-gray-500 float-right">Active Sessions: ${data.active_sessions}</span>
+                        </div>
+                        <div class="p-2 bg-gray-50 rounded text-sm">
+                            <span class="font-medium">Optimized Queries: ${optimizer.optimized_queries}</span>
+                            <span class="text-gray-500 float-right">Cached Patterns: ${optimizer.cached_patterns}</span>
+                        </div>
+                    `;
+                } else {
+                    historyContainer.innerHTML = '<p class="text-gray-500">No recent queries</p>';
+                }
+                
+                // Update performance chart placeholder
+                document.getElementById('performanceChart').innerHTML = `
+                    <div class="text-center">
+                        <div class="grid grid-cols-3 gap-4 text-sm">
+                            <div class="p-3 bg-blue-50 rounded">
+                                <div class="font-medium text-blue-800">Vector Search</div>
+                                <div class="text-lg font-bold text-blue-600">${(vectorSuccess * 100).toFixed(1)}%</div>
+                                <div class="text-xs text-blue-600">Success Rate</div>
+                            </div>
+                            <div class="p-3 bg-green-50 rounded">
+                                <div class="font-medium text-green-800">Graph Search</div>
+                                <div class="text-lg font-bold text-green-600">${((data.agent_performance?.graph?.success_rate || 1.0) * 100).toFixed(1)}%</div>
+                                <div class="text-xs text-green-600">Success Rate</div>
+                            </div>
+                            <div class="p-3 bg-purple-50 rounded">
+                                <div class="font-medium text-purple-800">Hybrid Search</div>
+                                <div class="text-lg font-bold text-purple-600">${((data.agent_performance?.hybrid?.success_rate || 1.0) * 100).toFixed(1)}%</div>
+                                <div class="text-xs text-purple-600">Success Rate</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Metrics load error:', error);
+                // Show error state
+                document.getElementById('totalQueries').textContent = 'Error';
+                document.getElementById('avgResponseTime').textContent = 'Error';
+                document.getElementById('avgRelevance').textContent = 'Error';
+                document.getElementById('errorRate').textContent = 'Error';
+            }
+        }
+
+        // Monitoring Functions
+        async function loadMonitoring() {
+            try {
+                const [healthResponse, statusResponse] = await Promise.all([
+                    fetch('/health'),
+                    fetch('/system/status')
+                ]);
+                
+                const healthData = await healthResponse.json();
+                const statusData = await statusResponse.json();
+                
+                // Update system resources from health data
+                const sysResources = healthData.components?.system_resources?.details;
+                document.getElementById('cpuUsage').textContent = sysResources?.cpu_percent ? `${sysResources.cpu_percent.toFixed(1)}%` : '-';
+                document.getElementById('memoryUsage').textContent = sysResources?.memory_percent ? `${sysResources.memory_percent.toFixed(1)}%` : '-';
+                document.getElementById('diskUsage').textContent = sysResources?.disk_percent ? `${sysResources.disk_percent.toFixed(1)}%` : '-';
+                
+                // Update database status from health data
+                const qdrantHealthy = healthData.components?.qdrant?.status === 'healthy';
+                const neo4jHealthy = healthData.components?.neo4j?.status === 'healthy';
+                
+                document.getElementById('qdrantStatus').textContent = qdrantHealthy ? '✅ Connected' : '❌ Disconnected';
+                document.getElementById('neo4jStatus').textContent = neo4jHealthy ? '✅ Connected' : '❌ Disconnected';
+                document.getElementById('connectionPool').textContent = statusData.statistics?.running ? `${statusData.statistics.running} Active` : '-';
+                
+                // Update health checks
+                const healthContainer = document.getElementById('healthChecks');
+                healthContainer.innerHTML = Object.entries(healthData.components || {}).map(([name, component]) => 
+                    `<div class="p-3 bg-gray-50 rounded">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium capitalize">${name.replace('_', ' ')}</span>
+                            <span class="${component.status === 'healthy' ? 'status-healthy' : 'status-unhealthy'}">
+                                ${component.status === 'healthy' ? '✅ Healthy' : '❌ Unhealthy'}
+                            </span>
+                        </div>
+                        <div class="text-sm text-gray-600 mt-1">${component.message}</div>
+                        <div class="text-xs text-gray-500">Response: ${(component.response_time * 1000).toFixed(2)}ms</div>
+                    </div>`
+                ).join('');
+                
+                // Update recent errors (placeholder for now)
+                document.getElementById('recentErrors').innerHTML = '<div class="text-sm text-gray-500">No recent errors</div>';
+                
+            } catch (error) {
+                console.error('Monitoring load error:', error);
+                // Show error state
+                document.getElementById('cpuUsage').textContent = 'Error';
+                document.getElementById('memoryUsage').textContent = 'Error';
+                document.getElementById('diskUsage').textContent = 'Error';
+                document.getElementById('qdrantStatus').textContent = '❌ Error';
+                document.getElementById('neo4jStatus').textContent = '❌ Error';
+            }
+        }
+
+        // Admin Functions
+        async function loadSystemInfo() {
+            try {
+                const [statusResponse, healthResponse] = await Promise.all([
+                    fetch('/system/status'),
+                    fetch('/health')
+                ]);
+                
+                const statusData = await statusResponse.json();
+                const healthData = await healthResponse.json();
+                
+                const infoContainer = document.getElementById('systemInfo');
+                const uptime = statusData.timestamp ? `${Math.floor((Date.now() / 1000 - statusData.timestamp) / 60)} minutes` : 'Unknown';
+                
+                infoContainer.innerHTML = `
+                    <div><strong>System Version:</strong> RAG Search v1.0</div>
+                    <div><strong>Overall Health:</strong> ${statusData.overall_health || 'Unknown'}</div>
+                    <div><strong>Services Running:</strong> ${statusData.statistics?.running || 0}/${statusData.statistics?.total_services || 0}</div>
+                    <div><strong>Database Collections:</strong> ${healthData.components?.qdrant?.details?.collections_count || 'Unknown'}</div>
+                    <div><strong>Auto Recovery:</strong> ${statusData.recovery_status?.auto_recovery_enabled ? 'Enabled' : 'Disabled'}</div>
+                    <div><strong>Last Backup:</strong> ${statusData.recovery_status?.last_backup ? new Date(statusData.recovery_status.last_backup * 1000).toLocaleString() : 'Unknown'}</div>
+                `;
+                
+                // Load error statistics from status data
+                const errorContainer = document.getElementById('errorStats');
+                const services = statusData.services || {};
+                let totalErrors = 0;
+                let errorDetails = [];
+                
+                Object.entries(services).forEach(([serviceName, serviceData]) => {
+                    totalErrors += serviceData.error_count || 0;
+                    errorDetails.push(`
+                        <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                            <span class="capitalize">${serviceName}:</span>
+                            <div class="text-right">
+                                <span class="font-medium">${serviceData.error_count || 0} errors</span>
+                                <div class="text-xs text-gray-500">${serviceData.recovery_attempts || 0} recovery attempts</div>
+                            </div>
+                        </div>
+                    `);
+                });
+                
+                errorContainer.innerHTML = errorDetails.join('') + `
+                    <div class="mt-3 p-3 bg-blue-50 rounded">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium">Total System Errors:</span>
+                            <span class="text-lg font-bold text-blue-600">${totalErrors}</span>
+                        </div>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('System info load error:', error);
+                document.getElementById('systemInfo').innerHTML = '<div class="text-red-600">Error loading system information</div>';
+                document.getElementById('errorStats').innerHTML = '<div class="text-red-600">Error loading error statistics</div>';
+            }
+        }
+
+        async function triggerSystemRecovery() {
+            if (confirm('Are you sure you want to trigger system recovery?')) {
+                try {
+                    const response = await fetch('/system/recovery', { method: 'POST' });
+                    const data = await response.json();
+                    alert(data.message || 'Recovery triggered successfully');
+                } catch (error) {
+                    alert('Recovery failed: ' + error.message);
+                }
+            }
+        }
+
+        // Utility Functions
+        function displayResults(containerId, results) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = results?.map(result => `
+                <div class="result-card bg-gray-50 p-4 rounded-md">
+                    <div class="font-medium text-gray-800">${result.question || 'No question'}</div>
+                    <div class="text-sm text-gray-600 mt-1">${result.text || result.doc_text || ''}</div>
+                    <div class="text-sm text-gray-600 mt-1">Answer: ${result.answer || 'No answer'}</div>
+                    <div class="text-xs text-gray-500 mt-2">Score: ${result.score?.toFixed(4) || 'N/A'}</div>
+                    ${result.image_url ? `
+                        <img src="${result.image_url}" alt="Document Image" 
+                             class="mt-2 max-w-full h-32 object-cover rounded cursor-pointer"
+                             onclick="openModal('${result.image_url}')">
+                    ` : ''}
+                </div>
+            `).join('') || '<p class="text-gray-500">No results found</p>';
+        }
+
+        function openModal(imgUrl) {
+            document.getElementById('imageModal').classList.add('active');
+            document.getElementById('modalImage').src = imgUrl;
+        }
+
+        function closeModal() {
+            document.getElementById('imageModal').classList.remove('active');
+        }
+
+        // Update threshold display
+        document.getElementById('similarityThreshold').addEventListener('input', function() {
+            document.getElementById('thresholdValue').textContent = this.value;
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshSystemStatus();
+            setInterval(refreshSystemStatus, 30000); // Refresh every 30 seconds
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'Enter':
+                        if (document.getElementById('searchTab').classList.contains('active')) {
+                            performSearch();
+                        }
+                        break;
+                }
+            }
+        });
+    </script>
+</body>
+</html> 

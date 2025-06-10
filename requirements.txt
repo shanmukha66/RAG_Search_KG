@@ -1,16 +1,49 @@
-flask==3.0.0
-qdrant-client==1.7.0
-neo4j==5.14.1
-sentence-transformers==2.2.2
-openai==1.3.5
-python-dotenv==1.0.0
-tqdm==4.66.1
-torch==2.1.2
-transformers==4.36.2
-numpy==1.24.3
-pandas==2.1.4
-scikit-learn==1.3.2
-pillow==10.1.0
-requests==2.31.0
-python-multipart==0.0.6
-gunicorn==21.2.0 
+# Core dependencies
+numpy>=1.21.0
+torch>=2.0.0
+transformers>=4.30.0
+tqdm>=4.65.0
+
+# Audio processing
+# openai-whisper  # Install manually: pip install git+https://github.com/openai/whisper.git
+pydub>=0.25.1
+
+# Video processing
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# Advanced Search Features
+spacy>=3.7.0  # For NLP and NER
+scikit-learn>=1.3.0  # For clustering and topic modeling
+
+# File type detection (platform-specific)
+python-magic>=0.4.27; sys_platform != "win32"
+python-magic-bin>=0.4.14; sys_platform == "win32"
+
+# PDF processing
+PyPDF2>=3.0.0
+
+# Optional dependencies (install manually if needed)
+# ffmpeg-python>=0.2.0  # For video processing
+# cuda-python>=12.0  # For GPU acceleration
+
+# Evaluation Framework
+deepeval==0.12.0
+pytest==7.4.3
+pytest-cov==4.1.0
+
+# Multimodal Processing
+whisper-openai==1.0.0
+moviepy==1.0.3
+
+# Security
+python-jose==3.3.0
+passlib==1.7.4
+bcrypt==4.0.1
+
+# Monitoring and Error Handling
+prometheus-client==0.17.1
+opentelemetry-api==1.20.0
+opentelemetry-sdk==1.20.0
+psutil>=5.9.0  # For system resource monitoring
+requests>=2.31.0  # For health checks 

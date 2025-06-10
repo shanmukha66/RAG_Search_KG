@@ -39,11 +39,31 @@ class RelevanceMetric(BaseMetric):
         
         return (context_relevance + query_relevance) / 2
 
+class HallucinationMetric(BaseMetric):
+    def __init__(self):
+        super().__init__()
+        self.name = "hallucination"
+    
+    def measure(self, context: List[str], response: str) -> float:
+        """Measure hallucination score - higher values mean less hallucination"""
+        if not response or not context:
+            return 0.5
+            
+        response_terms = set(response.lower().split())
+        context_terms = set(" ".join(context).lower().split())
+        
+        # Calculate overlap between response and context
+        overlap = len(response_terms.intersection(context_terms))
+        score = overlap / len(response_terms) if response_terms else 0.5
+        
+        return min(1.0, max(0.0, score))
+
 class RAGEvaluator:
     def __init__(self):
         self.metrics = {
             'latency': LatencyMetric(),
-            'relevance': RelevanceMetric()
+            'relevance': RelevanceMetric(),
+            'hallucination': HallucinationMetric()
         }
         self.results_history = []
     
@@ -73,6 +93,9 @@ class RAGEvaluator:
         
         # Measure relevance
         results['relevance'] = self.metrics['relevance'].measure(query, response, context)
+        
+        # Measure hallucination (higher score = less hallucination)
+        results['hallucination_score'] = self.metrics['hallucination'].measure(context, response)
         
         # Store results
         self.results_history.append({
