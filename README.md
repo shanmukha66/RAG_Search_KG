@@ -6,6 +6,17 @@ A production-ready, multimodal Retrieval-Augmented Generation (RAG) system that 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
+## Youtube Video
+<p align="center">
+  <a href="https://youtu.be/vYaZjrVMTuI?si=C1gvVHDPl2PWpLA2" target="_blank">
+    <img 
+      src="https://img.youtube.com/vi/vYaZjrVMTuI/maxresdefault.jpg" 
+      alt="▶ Watch the demo on YouTube" 
+      width="600"
+    />
+  </a>
+</p>
+
 ## 🎯 **Key Features**
 
 ### 🔍 **Advanced Search & AI**
