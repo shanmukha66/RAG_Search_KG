@@ -19,65 +19,238 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
-.pytest_cache/
-.coverage
-htmlcov/
-.env
+
+# Virtual Environment
 venv/
-.venv/
+env/
+ENV/
+.env
 
-# Node/React
-ui/node_modules/
-ui/.pnp
-ui/.pnp.js
-ui/coverage/
-ui/build/
-ui/.DS_Store
-ui/.env.local
-ui/.env.development.local
-ui/.env.test.local
-ui/.env.production.local
-ui/npm-debug.log*
-ui/yarn-debug.log*
-ui/yarn-error.log*
-
-# IDE specific files
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-.DS_Store
+.project
+.pydevproject
+.settings/
 *.sublime-workspace
 *.sublime-project
 
+# Large Data Files (DO NOT COMMIT)
+## JSON data files
+ocr_data.json
+qa_data.json
+vector_chunks.json
+**/ocr_data.json
+**/qa_data.json
+**/vector_chunks.json
+data/*.json
+processed/*.json
+
+## Backup data files
+ocr_data.json.bak
+qa_data.json.bak
+vector_chunks.json.bak
+*.json.bak
+
+## Temporary data files
+ocr_data.json.tmp
+qa_data.json.tmp
+vector_chunks.json.tmp
+*.json.tmp
+
+## Additional large data files
+spdocvqa_imdb/
+spdocvqa_ocr/
+spdocvqa_qas/
+evaluation/results/
+*.model
+*.bin
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.npy
+*.npz
+
+# Docker and Container Data
+docker-compose.override.yml
+.docker/
+*/data/
+data/
+qdrant_storage/
+neo4j/
+neo4j_data/
+qdrant_data/
+docker/data/
+docker/volumes/
+**/docker/data/
+**/docker/volumes/
+.docker-compose/
+docker-compose.override.yaml
+docker-compose.override.yml
+.env.docker
+docker-data/
+.docker-sync/
+docker-sync.yml
+*.dockerignore
+
+## Additional Docker patterns
+.docker-compose.*.yml
+docker-compose.*.yaml
+docker-compose.*.yml
+docker/config/
+docker/secrets/
+.dockerenv
+
+# Docker logs and temp files
+docker-compose.log
+docker-compose.*.log
+*.log.json
+docker/*.log
+docker/**/*.log
+docker-compose.debug.yml
+docker-compose.local.yml
+docker-compose.prod.yml
+docker-compose.staging.yml
+docker-compose.test.yml
+
 # Project specific
 logs/
-data/
-*.log
-.env.*
-!.env.example
+tmp/
 
-# Neo4j
-data/neo4j/
-neo4j/data/
-neo4j/logs/
+# Large data files and ingestion artifacts
+ingestion_logs/
+processed_data/
+temp_data/
+intermediate_files/
+*.chunk
+*.vectors
+*.processed
+*.indexed
+*.ingest
+*.dump
+dump.rdb
 
-# Large files & datasets
-*.zip
-*.tar.gz
-*.rar
-*.7z
+# Images and media
+spdocvqa_images/*
+!spdocvqa_images/.gitkeep
+*.jpg
+*.jpeg
+*.png
+*.gif
 *.mp4
 *.avi
 *.mov
-*.wav
-*.mp3
+
+## Additional media patterns
+*.tiff
+*.bmp
+*.svg
+*.ico
+*.webp
+*.raw
 *.pdf
 *.doc
 *.docx
 *.xls
 *.xlsx
-*.csv
-!requirements.txt
-!example_data/ 
+*.ppt
+*.pptx
+
+# Database files and volumes
+*.db
+*.sqlite
+*.sqlite3
+data/db/
+data/neo4j/
+data/qdrant/
+volumes/
+*/volumes/
+**/volumes/
+*.dat
+*.dir
+*.bak
+*.db-journal
+*.db-shm
+*.db-wal
+
+## Additional database patterns
+redis-data/
+elasticsearch-data/
+mongo-data/
+postgres-data/
+mysql-data/
+*.rdb
+*.aof
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Certificates and sensitive data
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.priv
+
+# Backup files
+*.bak
+*.backup
+*~
+*.swp
+*.swo
+
+# Debug files
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Local development settings
+local_settings.py
+settings_local.py
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Debug and log files
+*.log
+debug/
+logs/
+log/
+tmp/
+temp/
+.debug/
+profiling/
+*.trace
+*.profile
+core.*

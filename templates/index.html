@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Search & QA System</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .result-card {
+            transition: transform 0.2s;
+        }
+        .result-card:hover {
+            transform: translateY(-2px);
+        }
+        .loading {
+            display: none;
+        }
+        .loading.active {
+            display: block;
+        }
+        .result-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+            margin-top: 0.5rem;
+            cursor: pointer;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+        }
+        .modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+        }
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal" onclick="closeModal()">
+        <span class="modal-close">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">Document Search & QA System</h1>
+        
+        <!-- Search Section -->
+        <div class="max-w-2xl mx-auto mb-8">
+            <div class="relative">
+                <input type="text" id="searchInput" 
+                       class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Enter your search query...">
+                <button onclick="performSearch()" 
+                        class="absolute right-2 top-2 bg-blue-500 text-white px-4 py-1 rounded-md hover:bg-blue-600">
+                    Search
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading text-center mb-8">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+
+        <!-- Metrics Section -->
+        <div class="max-w-4xl mx-auto mb-8">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">Response Metrics</h2>
+                <div id="metrics" class="grid grid-cols-2 gap-4">
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium text-gray-700">Latency</h3>
+                        <p id="latencyMetric" class="text-2xl font-bold text-blue-600">-</p>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium text-gray-700">Relevance Score</h3>
+                        <p id="relevanceMetric" class="text-2xl font-bold text-green-600">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Response Section -->
+        <div class="max-w-4xl mx-auto mb-8">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">AI Response</h2>
+                <div id="aiResponse" class="prose max-w-none">
+                    <!-- AI response will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="grid md:grid-cols-2 gap-6">
+            <!-- Vector Search Results -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">Vector Search Results</h2>
+                <div id="vectorResults" class="space-y-4"></div>
+            </div>
+
+            <!-- Graph Search Results -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">Graph Search Results</h2>
+                <div id="graphResults" class="space-y-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openModal(imgUrl) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.classList.add('active');
+            modalImg.src = imgUrl;
+        }
+
+        function closeModal() {
+            document.getElementById('imageModal').classList.remove('active');
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value;
+            if (!query.trim()) return;
+
+            // Show loading
+            document.getElementById('loading').classList.add('active');
+            
+            try {
+                const formData = new FormData();
+                formData.append('query', query);
+
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                // Display metrics
+                document.getElementById('latencyMetric').textContent = data.metrics.latency;
+                document.getElementById('relevanceMetric').textContent = data.metrics.relevance_score;
+                
+                // Display AI response
+                const aiResponse = document.getElementById('aiResponse');
+                aiResponse.innerHTML = `<p class="text-gray-800">${data.ai_response || 'No response generated.'}</p>`;
+                
+                // Display vector results
+                const vectorResults = document.getElementById('vectorResults');
+                vectorResults.innerHTML = data.vector_results.map(result => `
+                    <div class="result-card bg-gray-50 p-4 rounded-md">
+                        <div class="font-medium text-gray-800">${result.question || 'No question'}</div>
+                        <div class="text-sm text-gray-600 mt-1">${result.text || ''}</div>
+                        <div class="text-sm text-gray-600 mt-1">Answer: ${result.answer || 'No answer'}</div>
+                        <div class="text-xs text-gray-500 mt-2">Score: ${result.score?.toFixed(4) || 'N/A'}</div>
+                        ${result.image_url ? `
+                            <img src="${result.image_url}" 
+                                 alt="Document Image" 
+                                 class="result-image"
+                                 onclick="openModal('${result.image_url}')"
+                            >
+                        ` : ''}
+                    </div>
+                `).join('');
+
+                // Display graph results
+                const graphResults = document.getElementById('graphResults');
+                graphResults.innerHTML = data.graph_results.map(result => `
+                    <div class="result-card bg-gray-50 p-4 rounded-md">
+                        <div class="font-medium text-gray-800">${result.question || 'No question'}</div>
+                        <div class="text-sm text-gray-600 mt-1">${result.doc_text || ''}</div>
+                        <div class="text-sm text-gray-600 mt-1">Answer: ${result.answer || 'No answer'}</div>
+                        ${result.image_url ? `
+                            <img src="${result.image_url}" 
+                                 alt="Document Image" 
+                                 class="result-image"
+                                 onclick="openModal('${result.image_url}')"
+                            >
+                        ` : ''}
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error:', error);
+                // Display error message in AI response section
+                document.getElementById('aiResponse').innerHTML = `
+                    <p class="text-red-600">Error: Failed to process your request. Please try again.</p>
+                `;
+            } finally {
+                // Hide loading
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        // Add event listener for Enter key
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // Close modal when pressing Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html> 
