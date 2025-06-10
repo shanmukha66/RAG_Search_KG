@@ -648,20 +648,111 @@
                 
                 // Display results in a more user-friendly format
                 if (data.search_results && data.search_results.length > 0) {
-                    const resultsHtml = data.search_results.map(result => `
-                        <div class="bg-gray-50 p-4 rounded-md mb-3">
-                            <div class="font-medium text-gray-800">${result.question || 'No question'}</div>
-                            <div class="text-sm text-gray-600 mt-1">${result.text || result.doc_text || ''}</div>
-                            <div class="text-sm text-gray-600 mt-1"><strong>Answer:</strong> ${result.answer || 'No answer'}</div>
-                            <div class="text-xs text-gray-500 mt-2">Score: ${result.score?.toFixed(4) || 'N/A'}</div>
-                            ${result.image_url ? `<img src="${result.image_url}" alt="Document Image" class="mt-2 max-w-full h-32 object-cover rounded cursor-pointer" onclick="openModal('${result.image_url}')">` : ''}
-                        </div>
-                    `).join('');
+                    const resultsHtml = data.search_results.map((result, index) => {
+                        // Extract metadata
+                        const metadata = result.metadata || {};
+                        const content = result.content || result.text || result.doc_text || '';
+                        const question = metadata.question || result.question || '';
+                        const answer = metadata.answer || result.answer || '';
+                        const docId = metadata.doc_id || result.doc_id || '';
+                        const source = result.source || 'unknown';
+                        const strategy = result.strategy || 'standard';
+                        
+                        // Determine result quality
+                        const score = result.score || 0;
+                        const qualityClass = score > 0.8 ? 'border-green-200 bg-green-50' : 
+                                           score > 0.6 ? 'border-yellow-200 bg-yellow-50' : 
+                                           'border-gray-200 bg-gray-50';
+                        
+                        const qualityIcon = score > 0.8 ? '🟢' : score > 0.6 ? '🟡' : '🔴';
+                        
+                        return `
+                            <div class="border ${qualityClass} p-4 rounded-md mb-3">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div class="font-medium text-gray-800">
+                                        ${qualityIcon} Result #${index + 1}
+                                        ${question ? ` - ${question}` : ''}
+                                    </div>
+                                    <div class="text-xs text-gray-500">
+                                        Score: ${score.toFixed(3)} | ${source}
+                                    </div>
+                                </div>
+                                
+                                ${content ? `
+                                    <div class="text-sm text-gray-700 mb-2">
+                                        <strong>Content:</strong> ${content.length > 200 ? content.substring(0, 200) + '...' : content}
+                                    </div>
+                                ` : ''}
+                                
+                                ${answer && answer !== 'No answer' ? `
+                                    <div class="text-sm text-blue-700 mb-2">
+                                        <strong>Answer:</strong> ${answer}
+                                    </div>
+                                ` : ''}
+                                
+                                <div class="flex flex-wrap gap-2 text-xs">
+                                    ${docId ? `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">Doc: ${docId}</span>` : ''}
+                                    ${strategy ? `<span class="bg-purple-100 text-purple-800 px-2 py-1 rounded">Strategy: ${strategy}</span>` : ''}
+                                    ${metadata.source ? `<span class="bg-green-100 text-green-800 px-2 py-1 rounded">Source: ${metadata.source}</span>` : ''}
+                                </div>
+                                
+                                ${result.image_url ? `
+                                    <img src="${result.image_url}" alt="Document Image" 
+                                         class="mt-2 max-w-full h-32 object-cover rounded cursor-pointer border"
+                                         onclick="openModal('${result.image_url}')">
+                                ` : ''}
+                            </div>
+                        `;
+                    }).join('');
                     
                     document.getElementById('advancedResultsContent').innerHTML = `
-                        <div class="mb-4">
-                            <h4 class="font-semibold text-lg">Search Results (${data.search_results.length})</h4>
-                            <p class="text-sm text-gray-600 mb-3">Method: ${method} | Processing time: ${data.metadata?.processing_time || 'N/A'}</p>
+                        <div class="mb-6">
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="font-semibold text-lg">Search Results (${data.search_results.length})</h4>
+                                <div class="text-sm text-gray-500">
+                                    Processing: ${(data.metadata?.processing_time || 0).toFixed(2)}s
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-3 gap-3 mb-4 text-sm">
+                                <div class="bg-blue-50 p-2 rounded">
+                                    <span class="font-medium">Method:</span> ${method}
+                                </div>
+                                <div class="bg-green-50 p-2 rounded">
+                                    <span class="font-medium">Agents:</span> ${data.metadata?.agents_used?.join(', ') || 'N/A'}
+                                </div>
+                                <div class="bg-purple-50 p-2 rounded">
+                                    <span class="font-medium">Quality:</span> ${data.metadata?.optimization_confidence ? (data.metadata.optimization_confidence * 100).toFixed(1) + '%' : 'N/A'}
+                                </div>
+                            </div>
+
+                            ${data.query_processing ? `
+                                <div class="bg-gray-50 p-3 rounded mb-4">
+                                    <h5 class="font-medium mb-2">Query Analysis:</h5>
+                                    <div class="text-sm space-y-1">
+                                        <div><strong>Original:</strong> ${data.query_processing.original_query}</div>
+                                        <div><strong>Optimized:</strong> ${data.query_processing.optimized_query}</div>
+                                        <div><strong>Intent:</strong> ${data.query_processing.intent}</div>
+                                        ${data.query_processing.entities ? `
+                                            <div><strong>Entities:</strong> ${Object.entries(data.query_processing.entities).filter(([k,v]) => v.length > 0).map(([k,v]) => `${k}: ${v.join(', ')}`).join(' | ') || 'None detected'}</div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            ${data.query_suggestions && data.query_suggestions.length > 0 ? `
+                                <div class="bg-blue-50 p-3 rounded mb-4">
+                                    <h5 class="font-medium mb-2">💡 Suggested queries to try:</h5>
+                                    <div class="space-y-1">
+                                        ${data.query_suggestions.map(suggestion => 
+                                            `<button onclick="document.getElementById('advancedQuery').value='${suggestion.replace(/"/g, '')}'; performAdvancedSearch();" 
+                                                     class="block w-full text-left text-sm text-blue-700 hover:text-blue-900 hover:bg-blue-100 p-2 rounded cursor-pointer">
+                                                ${suggestion}
+                                            </button>`
+                                        ).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
                         </div>
                         ${resultsHtml}
                     `;
@@ -732,12 +823,81 @@
             formData.append('category', document.getElementById('contentCategory').value);
 
             try {
+                // Show progress
                 document.getElementById('uploadProgress').style.display = 'block';
-                // Note: File upload endpoint would need to be implemented
-                alert('File upload feature requires additional backend implementation');
+                document.getElementById('progressText').textContent = 'Uploading files...';
+                document.getElementById('progressBar').style.width = '30%';
+
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                document.getElementById('progressBar').style.width = '80%';
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                document.getElementById('progressBar').style.width = '100%';
+                document.getElementById('progressText').textContent = 'Upload complete!';
+
+                // Show results
+                if (data.status === 'success') {
+                    const resultsHtml = data.files.map(file => `
+                        <div class="bg-green-50 border border-green-200 rounded-md p-4 mb-3">
+                            <div class="flex items-center">
+                                <i class="fas fa-check-circle text-green-600 mr-3"></i>
+                                <div class="flex-1">
+                                    <h4 class="font-medium text-green-800">${file.filename}</h4>
+                                    <p class="text-sm text-green-600">${file.message}</p>
+                                    <div class="text-xs text-green-500 mt-1">
+                                        Size: ${(file.size / 1024).toFixed(1)} KB | 
+                                        Type: ${file.type} | 
+                                        Category: ${file.category}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+
+                    const nextStepsHtml = data.next_steps.map(step => 
+                        `<li class="text-sm text-gray-600">${step}</li>`
+                    ).join('');
+
+                    // Add results after the upload progress
+                    const resultsDiv = document.createElement('div');
+                    resultsDiv.className = 'mt-6';
+                    resultsDiv.innerHTML = `
+                        <h3 class="text-lg font-semibold text-green-800 mb-3">
+                            <i class="fas fa-check mr-2"></i>Upload Successful!
+                        </h3>
+                        ${resultsHtml}
+                        <div class="bg-blue-50 border border-blue-200 rounded-md p-4 mt-4">
+                            <h4 class="font-medium text-blue-800 mb-2">Next Steps:</h4>
+                            <ul class="list-disc list-inside space-y-1">
+                                ${nextStepsHtml}
+                            </ul>
+                        </div>
+                    `;
+                    
+                    document.getElementById('uploadProgress').parentNode.appendChild(resultsDiv);
+
+                    // Clear file input
+                    fileInput.value = '';
+                    document.getElementById('selectedFiles').innerHTML = '';
+                } else {
+                    throw new Error(data.error || 'Upload failed');
+                }
+
             } catch (error) {
                 console.error('Upload error:', error);
-                alert('Upload failed. Please try again.');
+                document.getElementById('progressText').textContent = 'Upload failed!';
+                document.getElementById('progressBar').style.width = '0%';
+                document.getElementById('progressBar').classList.add('bg-red-500');
+                
+                alert(`Upload failed: ${error.message}`);
             }
         }
 

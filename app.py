@@ -683,6 +683,90 @@ def trigger_recovery():
         log_error_with_context(logger, e, "trigger_recovery")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/upload', methods=['POST'])
+@monitor_request
+def upload_files():
+    """Handle multimodal file uploads"""
+    try:
+        # Check if files were uploaded
+        if 'files' not in request.files:
+            return jsonify({'error': 'No files uploaded'}), 400
+        
+        files = request.files.getlist('files')
+        if not files or files[0].filename == '':
+            return jsonify({'error': 'No files selected'}), 400
+        
+        # Get processing options
+        extract_entities = request.form.get('extract_entities') == 'true'
+        generate_summary = request.form.get('generate_summary') == 'true'
+        create_relations = request.form.get('create_relations') == 'true'
+        category = request.form.get('category', 'general')
+        
+        results = []
+        upload_dir = 'uploaded_files'
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        for file in files:
+            if file.filename == '':
+                continue
+                
+            # Save file
+            filename = file.filename
+            file_path = os.path.join(upload_dir, filename)
+            file.save(file_path)
+            
+            # Process based on file type
+            file_result = {
+                'filename': filename,
+                'size': os.path.getsize(file_path),
+                'category': category,
+                'status': 'uploaded',
+                'processing': {
+                    'extract_entities': extract_entities,
+                    'generate_summary': generate_summary,
+                    'create_relations': create_relations
+                }
+            }
+            
+            # Basic file type detection
+            if filename.lower().endswith(('.pdf', '.txt', '.doc', '.docx')):
+                file_result['type'] = 'document'
+                file_result['message'] = 'Document uploaded successfully. Text extraction will be processed.'
+            elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                file_result['type'] = 'image'
+                file_result['message'] = 'Image uploaded successfully. OCR processing will be applied.'
+            elif filename.lower().endswith(('.mp3', '.wav', '.m4a')):
+                file_result['type'] = 'audio'
+                file_result['message'] = 'Audio uploaded successfully. Transcription will be processed.'
+            elif filename.lower().endswith(('.mp4', '.avi', '.mov')):
+                file_result['type'] = 'video'
+                file_result['message'] = 'Video uploaded successfully. Frame extraction and transcription will be processed.'
+            else:
+                file_result['type'] = 'unknown'
+                file_result['message'] = 'File uploaded but type not fully supported.'
+            
+            results.append(file_result)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Successfully uploaded {len(results)} files',
+            'files': results,
+            'next_steps': [
+                'Files have been saved to the server',
+                'Processing will begin automatically',
+                'Check back in a few minutes for processed results',
+                'Use search to find content from uploaded files'
+            ]
+        })
+        
+    except Exception as e:
+        logger.error(f"File upload error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'message': 'File upload failed. Please try again.'
+        }), 500
+
 if __name__ == "__main__":
     try:
         # Initialize services

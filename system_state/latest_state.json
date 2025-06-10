@@ -1,10 +1,10 @@
 {
-  "timestamp": 1749552765.048204,
+  "timestamp": 1749553227.62206,
   "services": {
     "qdrant": {
       "name": "qdrant",
       "state": "running",
-      "last_check": 1749552765.0439339,
+      "last_check": 1749553227.617579,
       "error_count": 0,
       "last_error": null,
       "recovery_attempts": 0,
@@ -13,7 +13,7 @@
     "neo4j": {
       "name": "neo4j",
       "state": "running",
-      "last_check": 1749552765.048197,
+      "last_check": 1749553227.6220539,
       "error_count": 0,
       "last_error": null,
       "recovery_attempts": 0,
@@ -22,6 +22,6 @@
   },
   "metadata": {
     "backup_version": "1.0",
-    "system_id": "175bd8b8-6236-404d-a6ee-9276c22e0a1f"
+    "system_id": "97c0d6a4-62ea-439d-97b4-9b449a43df5a"
   }
 }
